@@ -1,0 +1,66 @@
+pip install statsmodels pandas matplotlib
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.api import VARMAX
+from sklearn.metrics import mean_squared_error
+
+np.random.seed(42)
+n = 150
+dates = pd.date_range('2020-01-01', periods=n, freq='M')
+data = pd.DataFrame(index=dates)
+
+# Generate synthetic time series data
+data['y1'] = np.cumsum(np.random.normal(loc=0.5, scale=1.0, size=n))
+data['y2'] = np.cumsum(np.random.normal(loc=0.2, scale=0.5, size=n))
+data['exog1'] = np.random.normal(loc=1.0, scale=0.2, size=n)
+data['exog2'] = np.random.normal(loc=0.5, scale=0.1, size=n)
+
+# Split into train and test sets
+train_data = data.iloc[:100]
+test_data = data.iloc[100:]
+
+# Define the endogenous and exogenous variables
+endog = train_data[['y1', 'y2']]
+exog = train_data[['exog1', 'exog2']]
+
+# Fit the VARMAX model
+model = VARMAX(endog, exog=exog, order=(1,1))
+fitted_model = model.fit(disp=False)
+print(fitted_model.summary())
+
+# Forecast on the test set
+n_forecast = len(test_data)
+forecast = fitted_model.get_forecast(steps=n_forecast, exog=test_data[['exog1', 'exog2']])
+forecast_df = forecast.predicted_mean
+
+# Compute Mean Squared Error
+mse_y1 = mean_squared_error(test_data['y1'], forecast_df['y1'])
+mse_y2 = mean_squared_error(test_data['y2'], forecast_df['y2'])
+print(f'MSE for y1: {mse_y1}')
+print(f'MSE for y2: {mse_y2}')
+
+# Forecast the next 12 months
+future_exog = pd.DataFrame({
+    'exog1': np.random.normal(loc=1.0, scale=0.2, size=12),
+    'exog2': np.random.normal(loc=0.5, scale=0.1, size=12)
+}, index=pd.date_range(start=test_data.index[-1] + pd.DateOffset(months=1), periods=12, freq='M'))
+
+forecast_future = fitted_model.get_forecast(steps=12, exog=future_exog)
+forecast_future_df = forecast_future.predicted_mean
+
+# Plot the forecast
+plt.figure(figsize=(10, 6))
+plt.plot(data['y1'], label='Actual y1')
+plt.plot(data['y2'], label='Actual y2')
+plt.plot(forecast_df['y1'], label='Forecast y1', linestyle='--')
+plt.plot(forecast_df['y2'], label='Forecast y2​⬤
+
+from statsmodels.stats.diagnostic import acorr_ljungbox
+
+# Perform Ljung-Box test for autocorrelation of residuals
+lb_test_y1 = acorr_ljungbox(fitted_model.resid['y1'], lags=[10], return_df=True)
+lb_test_y2 = acorr_ljungbox(fitted_model.resid['y2'], lags=[10], return_df=True)
+print('Ljung-Box test for y1:\n', lb_test_y1)
+print('Ljung-Box test for y2:\n', lb_test_y2)
