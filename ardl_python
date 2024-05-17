@@ -1,0 +1,84 @@
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+import statsmodels.tsa.api as tsa
+import matplotlib.pyplot as plt
+
+# Load a sample dataset (e.g., inflation and GDP data)
+# For this example, we'll generate synthetic data
+np.random.seed(42)
+n = 100
+dates = pd.date_range(start='2000-01-01', periods=n, freq='Q')
+inflation = np.random.normal(2, 0.5, n).cumsum()
+gdp = np.random.normal(100, 10, n).cumsum()
+data = pd.DataFrame({'Inflation': inflation, 'GDP': gdp}, index=dates)
+
+# Plot the data
+data.plot(subplots=True, figsize=(10, 6))
+plt.show()
+
+from statsmodels.tsa.stattools import adfuller
+
+def adf_test(series, title=''):
+    """
+    Perform ADFuller to test for Stationarity of given series and print report
+    """
+    print(f'Augmented Dickey-Fuller Test: {title}')
+    result = adfuller(series.dropna(), autolag='AIC')
+    labels = ['ADF Test Statistic', 'p-value', '# Lags Used', '# Observations Used']
+    out = pd.Series(result[0:4], index=labels)
+    for key, value in result[4].items():
+        out[f'Critical Value ({key})'] = value
+    print(out.to_string())
+    print('')
+
+# Perform ADF test
+adf_test(data['Inflation'], title='Inflation')
+adf_test(data['GDP'], title='GDP')
+
+from statsmodels.tsa.ardl import ardl_select_order
+
+# Select optimal lag length
+selected_model = ardl_select_order(data['Inflation'], data[['GDP']], maxlag=4)
+print(selected_model.model)
+
+from statsmodels.tsa.ardl import ARDL
+
+# Fit ARDL model
+model = ARDL(data['Inflation'], lags=selected_model.model.lags, exog=data[['GDP']], maxlag=4)
+ardl_fit = model.fit()
+print(ardl_fit.summary())
+
+# Residual diagnostics
+sm.graphics.tsa.plot_acf(ardl_fit.resid, lags=40)
+plt.show()
+sm.graphics.tsa.plot_pacf(ardl_fit.resid, lags=40)
+plt.show()
+sm.qqplot(ardl_fit.resid, line='s')
+plt.show()
+
+# Perform Ljung-Box test
+from statsmodels.stats.diagnostic import acorr_ljungbox
+lb_test = acorr_ljungbox(ardl_fit.resid, lags=[10], return_df=True)
+print(lb_test)
+
+# Backtesting: split the data into train and test
+train_size = int(len(data) * 0.8)
+train, test = data[:train_size], data[train_size:]
+
+# Refit the model on training data
+train_model = ARDL(train['Inflation'], lags=selected_model.model.lags, exog=train[['GDP']], maxlag=4)
+train_fit = train_model.fit()
+
+# Forecast
+forecast = train_fit.forecast(steps=len(test), exog_oos=test[['GDP']])
+forecast = pd.Series(forecast, index=test.index, name='Forecast')
+
+# Plot the forecast
+plt.figure(figsize=(10, 6))
+plt.plot(train['Inflation'], label='Train')
+plt.plot(test['Inflation'], label='Test')
+plt.plot(forecast, label='Forecast')
+plt.legend()
+plt.show()
+
