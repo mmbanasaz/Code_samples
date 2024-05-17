@@ -1,0 +1,74 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from statsmodels.tsa.api import VAR
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.stats.stattools import durbin_watson
+
+# Create a synthetic dataset
+np.random.seed(0)
+n_obs = 100
+dates = pd.date_range(start='2000-01-01', periods=n_obs, freq='M')
+data = np.cumsum(np.random.randn(n_obs, 2), axis=0)
+df = pd.DataFrame(data, columns=['variable1', 'variable2'], index=dates)
+
+def adf_test(series, name):
+    result = adfuller(series)
+    print(f'ADF Test for {name}')
+    print(f'Statistic: {result[0]}')
+    print(f'p-value: {result[1]}')
+    for key, value in result[4].items():
+        print(f'Critial Values {key}, {value}')
+        
+adf_test(df['variable1'], 'variable1')
+adf_test(df['variable2'], 'variable2')
+
+df_diff = df.diff().dropna()
+
+model = VAR(df_diff)
+lag_order = model.select_order(maxlags=15)
+print(lag_order.summary())
+
+model_fitted = model.fit(lag_order.aic)
+print(model_fitted.summary())
+
+out = durbin_watson(model_fitted.resid)
+for col, val in zip(df_diff.columns, out):
+    print(f'{col}: {val}')
+
+model_fitted.plot_forecast(10)
+plt.show()
+
+print(model_fitted.is_stable())
+
+forecast = model_fitted.forecast(df_diff.values[-model_fitted.k_ar:], steps=10)
+forecast_df = pd.DataFrame(forecast, index=pd.date_range(start=df_diff.index[-1], periods=10, freq='M'), columns=df.columns)
+print(forecast_df)
+
+irf = model_fitted.irf(10)
+irf.plot(orth=False)
+plt.show()
+
+# Assuming we have a test set to compare
+train_size = int(len(df_diff) * 0.8)
+train, test = df_diff[:train_size], df_diff[train_size:]
+
+model = VAR(train)
+model_fitted = model.fit(lag_order.aic)
+
+forecast = model_fitted.forecast(train.values[-model_fitted.k_ar:], steps=len(test))
+forecast_df = pd.DataFrame(forecast, index=test.index, columns=df.columns)
+
+# Plot actual vs forecast
+plt.figure(figsize=(10, 5))
+plt.plot(test['variable1'], label='Actual Variable 1')
+plt.plot(forecast_df['variable1'], label='Forecasted Variable 1', linestyle='dashed')
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(10, 5))
+plt.plot(df['variable1'], label='Actual Variable 1')
+plt.plot(forecast_df['variable1'], label='Forecasted Variable 1', linestyle='dashed')
+plt.legend()
+plt.show()
