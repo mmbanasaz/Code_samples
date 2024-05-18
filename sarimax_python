@@ -46,3 +46,26 @@ plt.plot(data['column_of_interest'], label='Actual')
 plt.plot(data['forecast'], label='Forecasted', color='red')
 plt.legend()
 plt.show()
+
+import itertools
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+p = d = q = range(0, 3)  # AR, I, MA parameters
+seasonal_pdq = [(x[0], x[1], x[2], 12) for x in list(itertools.product(p, d, q))]  # Seasonal parameters
+
+best_aic = float("inf")
+best_params = None
+
+for param in itertools.product(p, d, q):
+    for seasonal_param in seasonal_pdq:
+        try:
+            model = SARIMAX(data, order=param, seasonal_order=seasonal_param,
+                            enforce_stationarity=False, enforce_invertibility=False)
+            results = model.fit()
+            if results.aic < best_aic:
+                best_aic = results.aic
+                best_params = (param, seasonal_param)
+        except:
+            continue
+
+print('Best SARIMAX{}x{}12 - AIC:{}'.format(best_params[0], best_params[1], best_aic))
