@@ -1,0 +1,45 @@
+import numpy as np
+import pandas as pd
+from statsmodels.tsa.api import VAR
+import matplotlib.pyplot as plt
+
+# Generate or load your data
+np.random.seed(42)
+data = np.random.randn(100, 2)
+dates = pd.date_range('20240101', periods=100)
+df = pd.DataFrame(data, columns=['Variable1', 'Variable2'], index=dates)
+
+# Fit a VAR model
+model = VAR(df)
+results = model.fit(maxlags=15, ic='aic')
+
+# Print summary
+print(results.summary())
+
+# Plotting diagnostics
+# We create a function to plot residuals and check for correlation and normality
+def plot_diagnostics(results):
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14, 10))
+    fig.suptitle('Diagnostics Plots', fontsize=16)
+
+    # Plot the residuals
+    residuals = results.resid
+    residuals.plot(ax=axes[0,0], title='Residuals')
+
+    # Plot the ACF of residuals for each variable
+    from statsmodels.graphics.tsaplots import plot_acf
+    for i, col in enumerate(residuals.columns):
+        plot_acf(residuals[col], ax=axes[i+1//2, i%2], title=f'ACF of Residuals for {col}')
+
+    # Check for normality of residuals (Histogram + KDE)
+    residuals.plot(kind='kde', ax=axes[1, 0], title='Density of Residuals')
+
+    # Q-Q plot for normality
+    from statsmodels.graphics.gofplots import qqplot
+    for i, col in enumerate(residuals.columns):
+        qqplot(residuals[col], line='s', ax=axes[i+1//2, i%2], title=f'Q-Q Plot for {col}')
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
+
+plot_diagnostics(results)
