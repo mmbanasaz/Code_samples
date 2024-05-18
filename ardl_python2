@@ -1,0 +1,55 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.api import ARDL
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+from statsmodels.tsa.stattools import adfuller
+
+# Load your data
+# This should be a DataFrame with datetime index and the variables of interest
+# data = pd.read_csv('your_data.csv', parse_dates=['date'], index_col='date')
+
+# Example data creation
+np.random.seed(0)
+dates = pd.date_range(start='2000-01-01', periods=100, freq='M')
+data = pd.DataFrame(data=np.random.randn(100, 2), index=dates, columns=['y', 'x'])
+
+# Check for stationarity
+def test_stationarity(series, signif=0.05):
+    result = adfuller(series, autolag='AIC')
+    p_value = result[1]
+    return p_value < signif
+
+# Ensure that the series are stationary
+data_diff = data.diff().dropna()
+if not test_stationarity(data_diff['y']):
+    print("Target variable is not stationary")
+if not test_stationarity(data_diff['x']):
+    print("Explanatory variable is not stationary")
+
+# Fit ARDL model
+model = ARDL(data_diff['y'], lags=1, order={'x': 1})
+fitted_model = model.fit()
+
+print(fitted_model.summary())
+
+# Backtesting
+predictions = fitted_model.predict(start=data_diff.index[0], end=data_diff.index[-1])
+
+# Forecasting
+forecast = fitted_model.forecast(steps=10)
+print(forecast)
+
+# Impulse Response Function
+irf = fitted_model.impulse_responses(steps=10)
+plt.plot(irf)
+plt.title('Impulse Response Function')
+plt.show()
+
+# Visualization of the results
+plt.figure(figsize=(10, 5))
+plt.plot(data_diff['y'], label='Actual')
+plt.plot(predictions, label='Predicted', color='red')
+plt.title('Model Fit: Actual vs. Predicted')
+plt.legend()
+plt.show()
