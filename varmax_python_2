@@ -1,0 +1,68 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.statespace.varmax import VARMAX
+from statsmodels.tsa.stattools import adfuller
+import warnings
+warnings.filterwarnings("ignore")
+
+# Load or simulate some data
+np.random.seed(42)
+data = np.random.randn(100, 2)  # 100 observations of 2 variables
+index = pd.date_range('2024-01-01', periods=100, freq='D')
+df = pd.DataFrame(data, columns=['Y1', 'Y2'], index=index)
+
+# Check stationarity
+def test_stationarity(timeseries):
+    dftest = adfuller(timeseries, autolag='AIC')
+    return dftest[1]  # p-value
+
+for col in df.columns:
+    pvalue = test_stationarity(df[col])
+    print(f'P-value for {col}: {pvalue} (Stationary if p < 0.05)')
+
+# Fit the model
+model = VARMAX(df, order=(1,1), trend='c')
+results = model.fit(disp=False)
+print(results.summary())
+
+# Diagnostics plot
+results.plot_diagnostics(figsize=(15, 12))
+plt.show()
+
+# Forecasting
+forecast = results.get_forecast(steps=10)
+mean_forecast = forecast.predicted_mean
+conf_int = forecast.conf_int()
+
+# Plotting the forecast
+plt.figure(figsize=(10, 5))
+plt.plot(df.index, df, label='Observed')
+plt.plot(mean_forecast.index, mean_forecast, color='r', label='Forecast')
+plt.fill_between(mean_forecast.index, conf_int.iloc[:, 0], conf_int.iloc[:, 1], color='pink')
+plt.legend()
+plt.show()
+
+# Impulse Response Function (IRF)
+irf = results.impulse_responses(steps=10)
+irf.plot()
+plt.show()
+
+# Backtesting
+# Example of a simple backtest by re-fitting the model every 10 observations and forecasting one step ahead
+history = df.copy()
+predictions = []
+for t in range(10, len(df)):
+    train = df.iloc[:t]
+    model = VARMAX(train, order=(1,1), trend='c')
+    result = model.fit(disp=False)
+    next_pred = result.forecast()
+    predictions.append(next_pred.iloc[0])
+
+# Convert predictions to DataFrame
+predictions_df = pd.DataFrame(predictions, index=df.index[10:])
+plt.figure(figsize=(10, 5))
+plt.plot(df, label='Actual')
+plt.plot(predictions_df, label='Backtested Forecast', linestyle='--')
+plt.legend()
+plt.show()
