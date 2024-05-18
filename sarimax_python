@@ -1,0 +1,48 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+# Load data
+data = pd.read_csv('your_data.csv', index_col='date', parse_dates=True)
+data = data.asfreq('MS')  # Ensure data frequency is set correctly, e.g., Monthly Start
+
+# Stationarity Test
+result = adfuller(data['column_of_interest'])
+print('ADF Statistic:', result[0])
+print('p-value:', result[1])
+
+# Specify the model
+model = SARIMAX(data['column_of_interest'], order=(1, 1, 1), seasonal_order=(1, 1, 1, 12), exog=data['exogenous_var'])
+
+# Fit the model
+model_fit = model.fit(disp=False)
+
+# Diagnostics
+model_fit.plot_diagnostics(figsize=(15, 12))
+plt.show()
+
+# Backtesting
+data['forecast'] = model_fit.predict(start='start_date', end='end_date', dynamic=True)
+
+# Forecasting
+forecast = model_fit.get_forecast(steps=12)
+data['forecast'] = forecast.predicted_mean
+
+# Impulse Response Function
+irf = model_fit.impulse_responses(steps=12)
+plt.figure(figsize=(10, 4))
+plt.plot(irf)
+plt.title('Impulse Response Function')
+plt.xlabel('Time Steps')
+plt.ylabel('Response')
+plt.show()
+
+# Visualization
+plt.figure(figsize=(12, 6))
+plt.plot(data['column_of_interest'], label='Actual')
+plt.plot(data['forecast'], label='Forecasted', color='red')
+plt.legend()
+plt.show()
