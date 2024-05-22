@@ -1,0 +1,40 @@
+import numpy as np
+import pandas as pd
+from statsmodels.tsa.vector_ar.var_model import VAR
+import matplotlib.pyplot as plt
+
+# Set a random seed for reproducibility
+np.random.seed(42)
+
+# Generate non-stationary data: random walks
+n_obs = 100
+variable1 = np.random.normal(loc=0, scale=1, size=n_obs).cumsum()
+variable2 = np.random.normal(loc=0, scale=1, size=n_obs).cumsum()
+
+# Combine into a DataFrame
+df = pd.DataFrame({
+    'Variable1': variable1,
+    'Variable2': variable2
+})
+
+# Plot the data to visualize non-stationarity
+plt.figure(figsize=(10, 5))
+plt.plot(df['Variable1'], label='Variable 1')
+plt.plot(df['Variable2'], label='Variable 2')
+plt.title('Non-stationary Data Generated as Random Walks')
+plt.legend()
+plt.show()
+
+# Fit a VAR model
+model = VAR(df)
+results = model.fit(maxlags=1)
+
+# Output the results
+print(results.summary())
+
+# Check for stationarity of the residuals
+residuals = results.resid
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(residuals)
+ax.set_title('Residuals from VAR Model')
+plt.show()
