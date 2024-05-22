@@ -1,0 +1,47 @@
+import numpy as np
+import pandas as pd
+from statsmodels.tsa.statespace.varmax import VARMAX
+import matplotlib.pyplot as plt
+
+# Set random seed for reproducibility
+np.random.seed(42)
+
+# Generate non-stationary data: random walks with drift
+n_obs = 100
+variable1 = np.random.normal(loc=0.1, scale=1, size=n_obs).cumsum()
+variable2 = np.random.normal(loc=0.1, scale=1, size=n_obs).cumsum()
+
+# Generate an exogenous series (e.g., a linear trend)
+exogenous = np.linspace(start=0, stop=10, num=n_obs)
+
+# Combine into a DataFrame
+df = pd.DataFrame({
+    'Variable1': variable1,
+    'Variable2': variable2
+})
+exog = pd.DataFrame({
+    'Trend': exogenous
+})
+
+# Plot the data to visualize
+plt.figure(figsize=(10, 5))
+plt.plot(df['Variable1'], label='Variable 1')
+plt.plot(df['Variable2'], label='Variable 2')
+plt.plot(exog['Trend'], label='Exogenous Trend', linestyle='--')
+plt.title('Simulated Time Series Data with Exogenous Variable')
+plt.legend()
+plt.show()
+
+# Fit a VARMAX model
+model = VARMAX(df, order=(1,1), exog=exog, trend='n')
+results = model.fit(disp=False)
+
+# Output the results
+print(results.summary())
+
+# Check for stationarity and fit of the residuals
+residuals = results.resid
+plt.figure(figsize=(10, 5))
+plt.plot(residuals)
+plt.title('Residuals from VARMAX Model')
+plt.show()
