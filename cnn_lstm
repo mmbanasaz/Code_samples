@@ -1,0 +1,54 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv1D, LSTM, Dense, Flatten
+from sklearn.model_selection import train_test_split
+
+# Generate some example data
+np.random.seed(42)
+time = np.arange(0, 100, 0.1)
+data = np.sin(time) + np.random.normal(scale=0.5, size=len(time))
+additional_feature = np.cos(time) + np.random.normal(scale=0.3, size=len(time))  # another time-dependent feature
+
+# Stack features alongside each other
+dataset = np.column_stack((data, additional_feature))
+
+# Prepare the data for training
+def create_dataset(dataset, n_steps):
+    X, y = [], []
+    for i in range(n_steps, len(dataset)):
+        X.append(dataset[i-n_steps:i])
+        y.append(dataset[i, 0])
+    return np.array(X), np.array(y)
+
+n_steps = 10
+X, y = create_dataset(dataset, n_steps)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Reshape from [samples, timesteps, features]
+n_features = X.shape[2]  # Number of features
+
+# Define the model
+model = Sequential([
+    Conv1D(filters=64, kernel_size=2, activation='relu', input_shape=(n_steps, n_features)),
+    LSTM(50, activation='relu'),
+    Dense(1)
+])
+
+# Compile the model
+model.compile(optimizer='adam', loss='mse')
+
+# Fit the model
+model.fit(X_train, y_train, epochs=200, verbose=0)
+
+# Make predictions
+predictions = model.predict(X_test, verbose=0)
+
+# Evaluate the model
+mse = model.evaluate(X_test, y_test, verbose=0)
+print(f'Model Mean Squared Error: {mse}')
+
+# Example of making a prediction
+x_input = np.array([dataset[-n_steps:]])
+yhat = model.predict(x_input, verbose=0)
+print(f'Predicted Value: {yhat[0][0]}')
