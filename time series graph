@@ -1,0 +1,45 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
+
+# Sample data creation
+# You can replace this with your actual DataFrame
+date_range = pd.date_range(start='2023-01-01', end='2023-12-31', freq='D')
+data = pd.DataFrame({
+    'Date': date_range,
+    'Series1': pd.Series(range(len(date_range))),
+    'Series2': pd.Series(range(len(date_range)))[::-1]
+})
+data.set_index('Date', inplace=True)
+
+# Plotting
+plt.figure(figsize=(10, 6))
+plt.plot(data.index, data['Series1'], label='Series 1', marker='o', linestyle='-')
+plt.plot(data.index, data['Series2'], label='Series 2', marker='', linestyle='--')
+
+# Formatting the x-axis
+plt.gca().xaxis.set_major_locator(mdates.MonthLocator())
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+
+# Adding grid, legend, and labels
+plt.grid(True)
+plt.legend()
+plt.title('Time Series Data')
+plt.xlabel('Date')
+plt.ylabel('Value')
+
+# Annotations
+critical_dates = {
+    '2023-06-01': 'Event 1',
+    '2023-09-01': 'Event 2'
+}
+for date, label in critical_dates.items():
+    plt.annotate(label, xy=(pd.Timestamp(date), data.at[pd.Timestamp(date), 'Series1']),
+                 xytext=(15, 15), textcoords='offset points', arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=.5'))
+
+# Show or save plot
+plt.tight_layout()
+plt.savefig('time_series_plot.png')  # Save to file
+plt.show()
