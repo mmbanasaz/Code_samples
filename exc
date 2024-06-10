@@ -1,0 +1,62 @@
+import statsmodels.api as sm
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.styles import Font, Alignment
+
+# Sample data
+data = {
+    'X1': [1, 2, 3, 4, 5],
+    'X2': [2, 3, 4, 5, 6],
+    'Y': [1, 2, 1, 2, 1]
+}
+df = pd.DataFrame(data)
+
+# Define independent variables (add a constant term)
+X = sm.add_constant(df[['X1', 'X2']])
+Y = df['Y']
+
+# Perform regression
+model = sm.OLS(Y, X).fit()
+summary = model.summary2()
+
+# Extract summary tables
+summary_df = summary.tables[1]
+
+# Create a new Excel workbook and sheet
+wb = Workbook()
+ws = wb.active
+ws.title = "Regression Results"
+
+# Add title and format it
+title = "Regression Results"
+ws['A1'] = title
+ws['A1'].font = Font(size=14, bold=True)
+ws['A1'].alignment = Alignment(horizontal='center')
+
+# Merge the title cell across the columns of the table
+ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(summary_df.columns))
+
+# Write the DataFrame to the Excel sheet
+for r_idx, row in enumerate(dataframe_to_rows(summary_df, index=True, header=True), start=3):
+    for c_idx, value in enumerate(row, start=1):
+        ws.cell(row=r_idx, column=c_idx, value=value)
+        if r_idx == 3:  # Apply formatting to the header
+            ws.cell(row=r_idx, column=c_idx).font = Font(bold=True)
+            ws.cell(row=r_idx, column=c_idx).alignment = Alignment(horizontal='center')
+
+# Auto-size columns
+for col in ws.columns:
+    max_length = 0
+    column = col[0].column_letter
+    for cell in col:
+        try:
+            if len(str(cell.value)) > max_length:
+                max_length = len(cell.value)
+        except:
+            pass
+    adjusted_width = (max_length + 2)
+    ws.column_dimensions[column].width = adjusted_width
+
+# Save the Excel workbook
+wb.save("regression_results.xlsx")
