@@ -1,0 +1,33 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.tsa.arima_process import ArmaProcess
+
+# Define the ARIMA process parameters
+ar_params = np.array([0.75, -0.25])  # AR coefficients
+ma_params = np.array([0.65])         # MA coefficients
+
+# Add the necessary lag for AR and MA terms
+ar = np.r_[1, -ar_params]  # add 1 for zero lag and negate the coefficients
+ma = np.r_[1, ma_params]   # add 1 for zero lag
+
+# Create an ARMA process
+arma_process = ArmaProcess(ar, ma)
+
+# Generate sample data from the ARMA process
+np.random.seed(42)  # For reproducibility
+n_samples = 100
+simulated_data = arma_process.generate_sample(nsample=n_samples)
+
+# Plot the simulated data
+plt.figure(figsize=(10, 6))
+plt.plot(simulated_data, label='Simulated ARIMA process')
+plt.title('Simulated ARIMA Process')
+plt.xlabel('Time')
+plt.ylabel('Value')
+plt.legend()
+plt.show()
+
+# Convert the simulated data to a pandas DataFrame
+simulated_data_df = pd.DataFrame(simulated_data, columns=['Value'])
+print(simulated_data_df.head())
