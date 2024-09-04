@@ -1,0 +1,109 @@
+import pandas as pd
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+import seaborn as sns
+from statsmodels.graphics.gofplots import qqplot
+from docx import Document
+from docx.shared import Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import nsdecls
+from docx.oxml import parse_xml
+
+# Example dataset
+df = pd.DataFrame({
+    'X1': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    'X2': [2, 1, 4, 3, 5, 7, 8, 7, 9, 10],
+    'Y': [1.1, 2.2, 2.9, 4.1, 5.2, 6.8, 7.9, 8.4, 9.5, 10.7]
+})
+
+# Prepare data for regression
+X = df[['X1', 'X2']]
+X = sm.add_constant(X)  # Adds a constant term to the predictors
+Y = df['Y']
+
+# Fit regression model
+model = sm.OLS(Y, X).fit()
+
+# Generate regression table
+summary_frame = model.summary2().tables[1]  # Get the regression coefficients table as DataFrame
+summary_frame.reset_index(inplace=True)
+summary_frame.columns = ['Term', 'Coefficient', 'Std Error', 't-value', 'P>|t|', '[0.025', '0.975]']
+
+# Generate residuals and diagnostics plots
+residuals = model.resid
+
+# Residual plot
+plt.figure(figsize=(6, 4))
+sns.residplot(x=model.fittedvalues, y=residuals, lowess=True, line_kws={'color': 'red', 'lw': 1})
+plt.xlabel('Fitted values')
+plt.ylabel('Residuals')
+plt.title('Residual Plot')
+plt.savefig('/mnt/data/residual_plot.png')
+plt.close()
+
+# Q-Q plot
+plt.figure(figsize=(6, 4))
+qqplot(residuals, line='s')
+plt.title('Q-Q Plot')
+plt.savefig('/mnt/data/qq_plot.png')
+plt.close()
+
+# Histogram of residuals
+plt.figure(figsize=(6, 4))
+sns.histplot(residuals, kde=True)
+plt.title('Histogram of Residuals')
+plt.xlabel('Residuals')
+plt.ylabel('Frequency')
+plt.savefig('/mnt/data/residual_histogram.png')
+plt.close()
+
+# Create a Word document
+doc = Document()
+
+doc.add_heading('Regression Analysis Report', 0)
+
+# Add regression table
+doc.add_heading('Regression Summary', level=1)
+
+# Insert a custom table for the regression summary
+table = doc.add_table(rows=1, cols=len(summary_frame.columns))
+table.style = 'Table Grid'
+hdr_cells = table.rows[0].cells
+
+# Add the headers
+for i, column in enumerate(summary_frame.columns):
+    hdr_cells[i].text = str(column)
+
+# Add the data rows
+for index, row in summary_frame.iterrows():
+    row_cells = table.add_row().cells
+    for i, value in enumerate(row):
+        row_cells[i].text = str(value)
+
+# Add some table formatting (Optional)
+for row in table.rows:
+    for cell in row.cells:
+        cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Add shading for table cells
+        shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+        cell._element.get_or_add_tcPr().append(shading_elm)
+
+# Add residual diagnostics section
+doc.add_heading('Residual Diagnostics', level=1)
+
+# Add Residual Plot
+doc.add_heading('Residual Plot', level=2)
+doc.add_picture('/mnt/data/residual_plot.png', width=Inches(5.5))
+
+# Add Q-Q Plot
+doc.add_heading('Q-Q Plot', level=2)
+doc.add_picture('/mnt/data/qq_plot.png', width=Inches(5.5))
+
+# Add Histogram of Residuals
+doc.add_heading('Histogram of Residuals', level=2)
+doc.add_picture('/mnt/data/residual_histogram.png', width=Inches(5.5))
+
+# Save the document
+doc.save('/mnt/data/regression_analysis_report.docx')
+
+print("Report saved successfully.")
