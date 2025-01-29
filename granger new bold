@@ -1,0 +1,43 @@
+import numpy as np
+import statsmodels.api as sm
+import matplotlib.pyplot as plt
+
+# Simulation parameters
+np.random.seed(42)  # For reproducibility
+T = 100  # Number of observations per simulation
+num_simulations = 1000  # Number of simulations
+r_squared_vals = []
+t_stats = []
+
+for _ in range(num_simulations):
+    # Generate two independent random walks
+    x = np.cumsum(np.random.randn(T))  # Random walk 1
+    y = np.cumsum(np.random.randn(T))  # Random walk 2
+
+    # Regress y on x
+    X = sm.add_constant(x)  # Add intercept
+    model = sm.OLS(y, X).fit()
+
+    # Store results
+    r_squared_vals.append(model.rsquared)
+    t_stats.append(model.tvalues[1])  # t-stat for x
+
+# Plot results
+fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+
+ax[0].hist(r_squared_vals, bins=30, edgecolor='black')
+ax[0].set_title("Histogram of R-squared values")
+ax[0].set_xlabel("R-squared")
+ax[0].set_ylabel("Frequency")
+
+ax[1].hist(t_stats, bins=30, edgecolor='black')
+ax[1].set_title("Histogram of t-statistics")
+ax[1].set_xlabel("t-statistic")
+ax[1].set_ylabel("Frequency")
+
+plt.tight_layout()
+plt.show()
+
+# Print average R-squared and t-statistic
+print(f"Average R-squared: {np.mean(r_squared_vals):.4f}")
+print(f"Percentage of t-stat > 2 (false significance): {np.mean(np.abs(t_stats) > 2) * 100:.2f}%")
