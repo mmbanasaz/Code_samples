@@ -1,0 +1,94 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
+from statsmodels.tsa.stattools import adfuller
+
+# Step 1: Generate Synthetic Data
+np.random.seed(42)
+n = 100  # Number of observations
+t = np.arange(n)
+
+X = np.cumsum(np.random.normal(0, 1, n))  # Random walk for X
+Y = 2 + 0.8 * X + np.random.normal(0, 1, n)  # Y depends on X with noise
+
+# Step 1: Estimate the Long-Run Relationship using Curve Fitting
+def long_run_eq(X, alpha, beta):
+    return alpha + beta * X
+
+popt_long, pcov_long = curve_fit(long_run_eq, X, Y)
+alpha_long, beta_long = popt_long
+Y_hat = long_run_eq(X, alpha_long, beta_long)  # Predicted Y
+
+# Compute Error Correction Term (ECT)
+ECT = Y - Y_hat  # Residuals from long-run equation
+ECT_lag = ECT[:-1]  # Lagged ECT for ECM
+
+# Step 2: Estimate the Short-Run ECM using Curve Fitting
+dY = np.diff(Y)
+dX = np.diff(X)
+
+def ECM(x, alpha, beta, gamma):
+    dX_t, ect_t_1 = x
+    return alpha + beta * dX_t + gamma * ect_t_1
+
+popt_ecm, pcov_ecm = curve_fit(ECM, (dX, ECT_lag), dY)
+alpha_ecm, beta_ecm, gamma_ecm = popt_ecm
+stderr_ecm = np.sqrt(np.diag(pcov_ecm))  # Standard errors
+
+# Report Results
+print("Step 1: Long-Run Relationship (Curve Fitting)")
+print(f"Estimated: Y_t = {alpha_long:.4f} + {beta_long:.4f} * X_t")
+
+print("\nStep 2: Estimated ECM Parameters")
+print(f"Alpha (constant): {alpha_ecm:.4f} ± {stderr_ecm[0]:.4f}")
+print(f"Beta (impact of ΔX): {beta_ecm:.4f} ± {stderr_ecm[1]:.4f}")
+print(f"Gamma (ECT adjustment speed): {gamma_ecm:.4f} ± {stderr_ecm[2]:.4f}")
+
+# ADF test on ECT to check stationarity
+adf_test = adfuller(ECT)
+print("\nADF Test on ECT (should be stationary):")
+print(f"ADF Statistic: {adf_test[0]:.4f}, p-value: {adf_test[1]:.4f}")
+
+# Step 3: Plot Results
+plt.figure(figsize=(12, 6))
+
+# Plot Long-Run Relationship
+plt.subplot(2, 2, 1)
+plt.plot(X, Y, "o", label="Observed Y")
+plt.plot(X, Y_hat, "r", label="Fitted Long-Run Y")
+plt.xlabel("X")
+plt.ylabel("Y")
+plt.title("Long-Run Relationship: Y vs X")
+plt.legend()
+
+# Plot ΔY and fitted values
+dY_fitted = ECM((dX, ECT_lag), *popt_ecm)
+plt.subplot(2, 2, 2)
+plt.plot(dY, label="Observed ΔY", marker="o")
+plt.plot(dY_fitted, label="Fitted ΔY (ECM)", linestyle="dashed")
+plt.xlabel("Time")
+plt.ylabel("ΔY")
+plt.title("Observed vs Fitted ΔY")
+plt.legend()
+
+# Plot ECT
+plt.subplot(2, 2, 3)
+plt.plot(ECT, label="Error Correction Term", color="g")
+plt.axhline(0, color="red", linestyle="--")
+plt.xlabel("Time")
+plt.ylabel("ECT")
+plt.title("Error Correction Term Over Time")
+plt.legend()
+
+# Residuals of ECM
+residuals = dY - dY_fitted
+plt.subplot(2, 2, 4)
+plt.plot(residuals, marker="o", linestyle="none", label="Residuals")
+plt.axhline(0, color="red", linestyle="--")
+plt.xlabel("Time")
+plt.ylabel("Residuals")
+plt.title("Residuals of ECM")
+plt.legend()
+
+plt.tight_layout()
+plt.show()
