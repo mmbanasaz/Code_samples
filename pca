@@ -1,0 +1,47 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
+# Load sample dataset (replace with your own dataset)
+# Example: Generating a random dataset with 5 features
+np.random.seed(42)
+data = np.random.rand(100, 5)
+df = pd.DataFrame(data, columns=[f'Feature_{i+1}' for i in range(5)])
+
+# Standardize the data (PCA is affected by scale)
+scaler = StandardScaler()
+data_scaled = scaler.fit_transform(df)
+
+# Perform PCA
+n_components = 2  # Adjust as needed
+pca = PCA(n_components=n_components)
+principal_components = pca.fit_transform(data_scaled)
+
+# Create a DataFrame for principal components
+df_pca = pd.DataFrame(principal_components, columns=[f'PC{i+1}' for i in range(n_components)])
+
+# Explained variance ratio
+explained_variance = pca.explained_variance_ratio_
+print("Explained Variance Ratio:", explained_variance)
+
+# Cumulative variance plot
+plt.figure(figsize=(8, 5))
+plt.plot(np.cumsum(pca.explained_variance_ratio_), marker='o', linestyle='--')
+plt.xlabel('Number of Principal Components')
+plt.ylabel('Cumulative Explained Variance')
+plt.title('Explained Variance by Principal Components')
+plt.grid()
+plt.show()
+
+# Scatter plot of the first two principal components
+plt.figure(figsize=(8, 6))
+plt.scatter(df_pca['PC1'], df_pca['PC2'], alpha=0.7, edgecolors='k')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.title('PCA: First Two Principal Components')
+plt.axhline(0, color='grey', linestyle='--', linewidth=0.5)
+plt.axvline(0, color='grey', linestyle='--', linewidth=0.5)
+plt.grid()
+plt.show()
