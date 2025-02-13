@@ -1,0 +1,65 @@
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.tsa.vector_ar.vecm import coint_johansen, VECM
+from statsmodels.stats.diagnostic import acorr_ljungbox, het_breuschpagan
+from statsmodels.stats.stattools import jarque_bera
+from statsmodels.tsa.stattools import adfuller
+
+# Sample data (replace with your own data)
+data = pd.DataFrame({
+    "variable1": np.random.randn(100).cumsum(),
+    "variable2": np.random.randn(100).cumsum(),
+    "variable3": np.random.randn(100).cumsum()
+})
+
+# Step 1: ADF test for stationarity
+def adf_test(series):
+    result = adfuller(series)
+    print(f"ADF Statistic for {series.name}: {result[0]}")
+    print(f"p-value: {result[1]}")
+    print("Critical Values:")
+    for key, value in result[4].items():
+        print(f"   {key}: {value}")
+    print("Stationary" if result[1] < 0.05 else "Non-stationary")
+    print("-" * 40)
+
+print("Step 1: ADF Tests")
+for col in data.columns:
+    adf_test(data[col])
+
+# Step 2: Johansen Cointegration Test
+print("\nStep 2: Johansen Cointegration Test")
+coint_test = coint_johansen(data, det_order=0, k_ar_diff=1)  # det_order=0 for no deterministic trend
+trace_stat = coint_test.lr1
+critical_values = coint_test.cvt
+
+for i in range(len(trace_stat)):
+    print(f"Trace Statistic for {i+1} cointegrating relationships: {trace_stat[i]}")
+    print(f"Critical Values (5%): {critical_values[i, 1]}")
+    print("Reject null hypothesis of no cointegration" if trace_stat[i] > critical_values[i, 1] else "Fail to reject null")
+    print("-" * 40)
+
+# Step 3: VECM Estimation
+print("\nStep 3: Estimating VECM")
+vecm_model = VECM(data, k_ar_diff=1, coint_rank=1)  # k_ar_diff=1 implies 1 lag difference
+vecm_fitted = vecm_model.fit()
+print(vecm_fitted.summary())
+
+# Step 4: Diagnostic Tests
+residuals = vecm_fitted.resid
+
+# Jarque-Bera Test for Normality
+jb_stat, jb_p_value, _, _ = jarque_bera(residuals)
+print(f"\nStep 4.1: Jarque-Bera Test for Normality\nJB Statistic: {jb_stat}, p-value: {jb_p_value}")
+print("Residuals are normally distributed" if jb_p_value > 0.05 else "Residuals are not normally distributed")
+
+# Ljung-Box Test for Autocorrelation
+lb_stat, lb_p_value = acorr_ljungbox(residuals, lags=[10], return_df=False)
+print(f"\nStep 4.2: Ljung-Box Test for Autocorrelation\nLjung-Box Statistic: {lb_stat[0]}, p-value: {lb_p_value[0]}")
+print("No autocorrelation" if lb_p_value[0] > 0.05 else "Autocorrelation detected")
+
+# Breusch-Pagan Test for Heteroskedasticity
+_, bp_p_value, _, _ = het_breuschpagan(residuals, sm.add_constant(data))
+print(f"\nStep 4.3: Breusch-Pagan Test for Heteroskedasticity\np-value: {bp_p_value}")
+print("No heteroskedasticity" if bp_p_value > 0.05 else "Heteroskedasticity detected")
