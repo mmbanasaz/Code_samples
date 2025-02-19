@@ -1,0 +1,81 @@
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.metrics import mean_squared_error
+
+# Load your data
+# Ensure your data includes a Date column (or use a time index)
+data = pd.read_csv('your_dataset.csv', parse_dates=['Date'], index_col='Date')
+
+# Step 1: Exploratory Data Analysis (EDA)
+# Check for missing values
+print(data.isnull().sum())
+
+# Visualize time series
+data['target_variable'].plot(figsize=(10, 6), title="Time Series of Target Variable")
+plt.show()
+
+# Step 2: Check stationarity using ADF test
+from statsmodels.tsa.stattools import adfuller
+
+result = adfuller(data['target_variable'])
+print(f'ADF Statistic: {result[0]}')
+print(f'p-value: {result[1]}')
+
+# Step 3: Differencing if necessary to make the series stationary
+if result[1] > 0.05:
+    data['target_diff'] = data['target_variable'].diff().dropna()
+    data['target_diff'].plot(title="Differenced Series")
+    plt.show()
+
+# Step 4: Include exogenous variables
+# Ensure the exogenous variables are stationary or transformed accordingly
+exog_vars = data[['exog1', 'exog2']]  # Replace with actual exogenous columns
+
+# Step 5: Determine AR, I, MA terms using ACF and PACF plots
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+plot_acf(data['target_variable'].dropna(), lags=20)
+plot_pacf(data['target_variable'].dropna(), lags=20)
+plt.show()
+
+# Step 6: Fit ARIMAX model
+# Example order (p, d, q) = (1, 1, 1); tune based on AIC/BIC
+order = (1, 1, 1)
+model = SARIMAX(data['target_variable'], order=order, exog=exog_vars, enforce_stationarity=False, enforce_invertibility=False)
+
+# Fit the model
+result = model.fit(disp=False)
+
+# Step 7: Model diagnostics
+result.plot_diagnostics(figsize=(12, 8))
+plt.show()
+
+# Step 8: Model summary and performance evaluation
+print(result.summary())
+
+# Step 9: Forecasting
+forecast_steps = 10
+forecast = result.get_forecast(steps=forecast_steps, exog=exog_vars.iloc[-forecast_steps:])
+forecast_ci = forecast.conf_int()
+
+# Plot forecast
+plt.figure(figsize=(10, 6))
+data['target_variable'].plot(label='Observed', color='blue')
+forecast.predicted_mean.plot(label='Forecast', color='red')
+plt.fill_between(forecast_ci.index, forecast_ci.iloc[:, 0], forecast_ci.iloc[:, 1], color='pink', alpha=0.3)
+plt.title("ARIMAX Forecast")
+plt.legend()
+plt.show()
+
+# Step 10: Calculate forecast error metrics (e.g., RMSE)
+y_true = data['target_variable'][-forecast_steps:]
+y_pred = forecast.predicted_mean
+rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+print(f'Root Mean Squared Error (RMSE): {rmse}')
+
+# Optional: Save model
+result.save('arimax_model.pkl')
