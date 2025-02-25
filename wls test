@@ -1,0 +1,104 @@
+# Load required packages
+install.packages(c("lmtest", "sandwich", "car", "boot", "MASS", "AER"))
+library(lmtest)
+library(sandwich)
+library(car)
+library(boot)
+library(MASS)
+library(AER)
+
+# Load your data
+data <- read.csv("your_data.csv")  # Replace with your actual data
+
+# Define the model formula
+formula <- y ~ x1 + x2 + x3  # Replace with your actual variables
+
+# Step 1: Estimate initial OLS model
+ols_model <- lm(formula, data = data)
+
+# Step 2: Extract residuals and fit weights (inverse of variance)
+weights <- 1 / lm(abs(residuals(ols_model)) ~ fitted(ols_model))$fitted.values^2
+
+# Step 3: Run Weighted Least Squares (WLS) regression
+wls_model <- lm(formula, data = data, weights = weights)
+
+# Display summary of the WLS model
+summary(wls_model)
+
+# ---------------------------------------------------------------------------
+# Step 4: Model Diagnostics
+# ---------------------------------------------------------------------------
+
+# Heteroscedasticity Tests
+bptest(wls_model)  # Breusch-Pagan test
+bptest(wls_model, ~ x1 + x2 + x3 + I(x1^2) + I(x2^2) + I(x3^2), data = data)  # White test
+
+# Check for Normality of Residuals
+shapiro.test(residuals(wls_model))  # Shapiro-Wilk test
+jarque.bera.test(residuals(wls_model))  # Jarque-Bera test
+
+# Multicollinearity Check
+vif(wls_model)  # Variance Inflation Factor
+
+# Functional Form Mis-specification (RESET test)
+resettest(wls_model)  
+
+# ---------------------------------------------------------------------------
+# Step 5: Robustness Checks
+# ---------------------------------------------------------------------------
+
+# 1. Alternative Weighting Scheme (Use absolute residuals)
+weights_alt <- 1 / abs(residuals(ols_model))
+wls_model_alt <- lm(formula, data = data, weights = weights_alt)
+summary(wls_model_alt)
+
+# 2. Sensitivity to Influential Observations (Cook’s Distance)
+influence <- cooks.distance(wls_model)
+plot(influence, type = "h", main = "Cook's Distance", ylab = "Influence Measure")
+data_no_outliers <- data[influence < (4 / nrow(data)), ]  # Removing high-influence points
+wls_model_no_outliers <- lm(formula, data = data_no_outliers, weights = weights[influence < (4 / nrow(data))])
+summary(wls_model_no_outliers)
+
+# 3. Bootstrapped Standard Errors
+boot_fn <- function(data, indices) {
+  d <- data[indices, ]  # Bootstrap sample
+  model <- lm(formula, data = d, weights = weights[indices])
+  return(coef(model))
+}
+set.seed(123)
+results <- boot(data, boot_fn, R = 1000)
+boot.ci(results, type = "bca")  # Confidence intervals for coefficients
+
+# ---------------------------------------------------------------------------
+# Step 6: Sensitivity Analysis
+# ---------------------------------------------------------------------------
+
+# 1. Subsample Analysis (Run WLS on subsets)
+subset1 <- subset(data, x1 > median(data$x1))  # Example: upper half of x1
+subset2 <- subset(data, x1 <= median(data$x1))  # Example: lower half of x1
+wls_subset1 <- lm(formula, data = subset1, weights = weights[1:nrow(subset1)])
+wls_subset2 <- lm(formula, data = subset2, weights = weights[(nrow(subset1) + 1):nrow(data)])
+summary(wls_subset1)
+summary(wls_subset2)
+
+# 2. Alternative Variable Specifications
+data$log_y <- log(data$y + 1)  # Log transformation of dependent variable
+wls_model_log <- lm(log_y ~ x1 + x2 + x3, data = data, weights = weights)
+summary(wls_model_log)
+
+# 3. Interaction Effects
+wls_model_interaction <- lm(formula + x1:x2, data = data, weights = weights)
+summary(wls_model_interaction)
+
+# ---------------------------------------------------------------------------
+# Step 7: Final Model Comparison
+# ---------------------------------------------------------------------------
+
+# Compare WLS vs. OLS
+summary(ols_model)
+summary(wls_model)
+anova(ols_model, wls_model)  # Compare model fit
+
+# Compare different robustness models
+AIC(wls_model, wls_model_alt, wls_model_no_outliers, wls_model_log, wls_model_interaction)
+BIC(wls_model, wls_model_alt, wls_model_no_outliers, wls_model_log, wls_model_interaction)
