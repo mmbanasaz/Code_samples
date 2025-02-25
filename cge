@@ -1,0 +1,43 @@
+import numpy as np
+from scipy.optimize import fsolve
+
+# Parameters
+alpha = 0.3  # Capital share in production
+beta = 0.7   # Labor share in production (1 - alpha)
+K_bar = 100   # Fixed supply of capital
+L_bar = 200   # Fixed supply of labor
+A = 1         # Productivity parameter
+
+# Cobb-Douglas Production Function
+def production(K, L):
+    return A * K**alpha * L**beta
+
+# System of Equations for Equilibrium
+def equilibrium(vars):
+    w, r = vars  # Variables: wage (w) and return on capital (r)
+
+    # Factor demands from firm's profit maximization
+    K_demand = (alpha * A * (L_bar / K_bar) ** (beta / alpha)) ** (1 / (1 - alpha - beta))
+    L_demand = (beta * A * (K_bar / L_bar) ** (alpha / beta)) ** (1 / (1 - alpha - beta))
+
+    # Market clearing conditions
+    eq1 = w - beta * production(K_bar, L_bar) / L_bar  # Labor market
+    eq2 = r - alpha * production(K_bar, L_bar) / K_bar  # Capital market
+
+    return [eq1, eq2]
+
+# Solve for equilibrium wages and return on capital
+initial_guess = [1, 1]  # Initial guess for w and r
+w_eq, r_eq = fsolve(equilibrium, initial_guess)
+
+# Compute equilibrium output and factor demands
+Y_eq = production(K_bar, L_bar)
+K_demand_eq = K_bar
+L_demand_eq = L_bar
+
+# Print results
+print(f"Equilibrium Wage (w): {w_eq:.3f}")
+print(f"Equilibrium Return on Capital (r): {r_eq:.3f}")
+print(f"Equilibrium Output (Y): {Y_eq:.3f}")
+print(f"Equilibrium Capital Demand: {K_demand_eq}")
+print(f"Equilibrium Labor Demand: {L_demand_eq}")
