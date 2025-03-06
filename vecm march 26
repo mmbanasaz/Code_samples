@@ -1,0 +1,113 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.vector_ar.vecm import coint_johansen, VECM
+
+# Step 1: Load Data
+# -----------------
+# Assume we have a CSV file with time series data where each column is a different variable.
+# The index should be in datetime format.
+data = pd.read_csv('your_data.csv', parse_dates=['date'], index_col='date')
+
+# Inspect the data
+print(data.head())
+print(data.info())
+
+# Step 2: Check for Stationarity with ADF Test (Optional but Recommended)
+# ----------------------------------------------------------------------
+from statsmodels.tsa.stattools import adfuller
+
+def adf_test(series):
+    result = adfuller(series, autolag='AIC')
+    print(f'ADF Statistic: {result[0]:.4f}')
+    print(f'p-value: {result[1]:.4f}')
+    if result[1] <= 0.05:
+        print("Stationary (Reject H0)")
+    else:
+        print("Non-Stationary (Fail to Reject H0)")
+
+# Apply ADF test to each series
+for col in data.columns:
+    print(f"ADF Test for {col}")
+    adf_test(data[col])
+    print('-' * 40)
+
+# Step 3: Johansen Cointegration Test
+# -----------------------------------
+# Perform Johansen cointegration test to determine how many cointegrating equations exist
+# The 'coint_johansen' function tests the null hypothesis of no cointegration
+# We select a lag of 1 here (change it based on your data)
+result = coint_johansen(data, det_order=0, k_ar_diff=1)  # det_order=0 for no deterministic trend
+
+# Print the test statistics
+print("\nJohansen Test Trace Statistics:")
+print(result.lr1)  # Trace Statistic
+print("Critical Values at 90%, 95%, 99%:")
+print(result.cvt)  # Critical values
+
+# Determine the number of cointegrating equations
+n_coint_eq = np.sum(result.lr1 > result.cvt[:, 1])  # At 5% significance level
+print(f"\nNumber of Cointegrating Equations (at 5% level): {n_coint_eq}")
+
+# Step 4: Fit the VECM Model
+# --------------------------
+# VECM is specified with the number of lags and the number of cointegrating equations
+vecm_model = VECM(endog=data, k_ar_diff=1, coint_rank=n_coint_eq, deterministic='ci')  # 'ci' means constant inside cointegration relation
+
+vecm_fitted = vecm_model.fit()
+print(vecm_fitted.summary())
+
+# Step 5: Granger Causality Test (Optional but Useful)
+# ---------------------------------------------------
+from statsmodels.tsa.stattools import grangercausalitytests
+
+print("\nGranger Causality Test Results:")
+for col in data.columns:
+    other_cols = [c for c in data.columns if c != col]
+    test_result = grangercausalitytests(data[[col] + other_cols], maxlag=2, verbose=True)
+
+# Step 6: Impulse Response Functions
+# -----------------------------------
+# Plot the Impulse Response Functions (IRFs) to see how shocks affect the system
+irf = vecm_fitted.irf(10)  # 10 periods ahead
+irf.plot(figsize=(10, 6))
+plt.show()
+
+# Step 7: Forecasting
+# -------------------
+# Make out-of-sample forecasts
+n_forecast = 10
+forecast = vecm_fitted.forecast(data.values[-vecm_model.k_ar_diff:], steps=n_forecast)
+forecast_index = pd.date_range(data.index[-1], periods=n_forecast + 1, freq='M')[1:]
+forecast_df = pd.DataFrame(forecast, index=forecast_index, columns=data.columns)
+
+print("\nForecasted Values:")
+print(forecast_df)
+
+# Plot Forecasts
+forecast_df.plot(figsize=(12, 6))
+plt.title("Forecast")
+plt.legend()
+plt.show()
+
+# Step 8: Residual Diagnostics
+# ----------------------------
+# Check if residuals are white noise
+from statsmodels.stats.diagnostic import acorr_ljungbox
+
+residuals = pd.DataFrame(vecm_fitted.resid, index=data.index[-len(vecm_fitted.resid):], columns=data.columns)
+for col in residuals.columns:
+    print(f"\nLjung-Box Test for {col}:")
+    print(acorr_ljungbox(residuals[col], lags=[10], return_df=True))
+
+# Step 9: Model Stability
+# -----------------------
+# Plot the eigenvalues to check stability
+eigvals = vecm_fitted.eigenvalues
+print(f"\nEigenvalues:\n{eigvals}")
+
+plt.figure(figsize=(8, 6))
+plt.plot(np.arange(len(eigvals)), np.abs(eigvals), 'bo-')
+plt.title("Eigenvalues (Should be < 1 for Stability)")
+plt.axhline(1, color='r', linestyle='--')
+plt.show()
