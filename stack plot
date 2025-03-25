@@ -1,0 +1,31 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Sample data: Time (x-axis) and 3 categories (y-values)
+x = np.linspace(1, 10, 10)
+category_1 = np.random.randint(5, 15, size=len(x))
+category_2 = np.random.randint(3, 10, size=len(x))
+category_3 = np.random.randint(2, 8, size=len(x))
+
+# Stack the data
+y_values = np.vstack([category_1, category_2, category_3])
+
+# Labels and colors
+labels = ['Category 1', 'Category 2', 'Category 3']
+colors = ['#1f77b4', '#ff7f0e', '#2ca02c']  # Blue, Orange, Green
+
+# Create the figure and axis
+fig, ax = plt.subplots(figsize=(8, 5))
+
+# Plot the stack plot
+ax.stackplot(x, y_values, labels=labels, colors=colors, alpha=0.8)
+
+# Customize the plot
+ax.set_title('Stack Plot Example', fontsize=14, fontweight='bold')
+ax.set_xlabel('Time', fontsize=12)
+ax.set_ylabel('Values', fontsize=12)
+ax.legend(loc='upper left', fontsize=10)
+ax.grid(True, linestyle='--', alpha=0.6)
+
+# Show the plot
+plt.show()
